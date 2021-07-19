@@ -1,0 +1,20 @@
+---
+- name: remove-registry.yml - Declare vars for this play
+  set_fact:
+    registry_name: "{{ outer_item.name }}"
+  tags: remove_registry_files
+
+- name: remove-registry.yml - Remove the registry container
+  become: yes
+  containers.podman.podman_container:
+    name: "{{ registry_name }}"
+    state: "{{ container_state }}"
+  tags: [ registry_container_state, container ]
+
+- name: remove-registry.yml - Remove container registry container files
+  file:
+    path: "{{ container_dir }}/{{ registry_name }}"
+    state: absent
+  become: yes
+  tags: remove_registry_files
+

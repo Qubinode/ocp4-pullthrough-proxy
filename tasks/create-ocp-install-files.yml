@@ -1,0 +1,59 @@
+---
+- name: encode local registry credentials to base64
+  shell: set -o pipefail && echo -n '{{ registry_username }}:{{ registry_password }}' | base64 -w0
+  register: registry_auth
+  changed_when: False
+  tags: [setup_htpasswd, deploy_registry, pullsecret]
+
+- name: Declare the local registries username and password auth var
+  set_fact:
+    registry_local_auth: "{{ registry_auth.stdout }}"
+  tags: [setup_htpasswd, deploy_registry, pullsecret]
+
+- name: create a temp local registry auth file
+  tempfile:
+    state: file
+    suffix: json
+  register: temp_config
+  tags: [setup_htpasswd, deploy_registry, pullsecret]
+
+- name: registries.yml - generate the registry auth file
+  vars:
+    registry_fqdn: "{{ item.name }}"
+    registry_port: "{{ item.port }}"
+  template:
+    src: templates/local_registry_auth.json.j2
+    dest: "{{ temp_config.path }}"
+    owner: "{{ container_user }}"
+    mode: '0644'
+  tags: [setup_htpasswd, deploy_registry, pullsecret]
+
+- name: registries.yml - merge the openshift pull scecret with the local registry auth
+  shell: >
+    set -o pipefail && jq -s '{"auths": ( .[0].auths + .[1].auths ) }' {{ temp_config.path }} {{ pull_secret }} > {{ generated_pull_secret }}
+  register: new_pull_secret
+  changed_when: False
+  tags: pullsecret
+  
+- name: create trust-bundle.txt file 
+  template:
+    src: templates/trust-bundle.txt.j2
+    dest: "{{ additional_trust_bundle }}"
+    owner: "{{ container_user }}"
+    mode: '0644'
+  tags: trust_file
+
+- name: update additional_trust_bundle with two spaces at start of each line
+  replace:
+    path: "{{ additional_trust_bundle }}"
+    regexp: '^'
+    replace: '  '
+  tags: trust_file
+
+- name: create content-sources.txt file 
+  template:
+    src: templates/content-sources.txt.j2
+    dest: "{{ image_content_sources }}"
+    owner: "{{ container_user }}"
+    mode: '0644'
+  tags: content_sources

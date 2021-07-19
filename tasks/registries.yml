@@ -1,0 +1,99 @@
+---
+- name: registries.yml - Declare vars for this play
+  set_fact:
+    registry_fqdn: "{{ outer_item.name }}.{{ registry_domain }}"
+    registry_port: "{{ outer_item.port }}"
+    registry_url: "{{ outer_item.remoteurl }}"
+    registry_username: "{{ outer_item.username }}"
+    registry_password: "{{ outer_item.password }}"
+    registry_name: "{{ outer_item.name }}"
+  tags: [ registry, deploy_registry, container ]
+
+- name: Declare containers_certs_d for registry {{ registry_name }}
+  tags: [ registry, deploy_registry, container ]
+  set_fact:
+    containers_certs_d: "/etc/containers/certs.d/{{ registry_fqdn }}:{{ registry_port }}"  
+
+- name: registries.yml - Create registry directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0775'
+    owner: "{{ container_user }}"
+    group: "{{ container_group }}"
+  loop:
+    - "{{ container_dir }}/{{ registry_name }}/registry"
+    - "{{ container_dir }}/{{ registry_name }}/conf"
+  tags: [ registry, deploy_registry, container ]
+
+
+- name: registries.yml - show registries
+  debug:
+    msg: "{{ item }}"
+  loop:
+    - "{{ container_dir }}/{{ registry_name }}/registry"
+    - "{{ container_dir }}/{{ registry_name }}/conf"
+  tags: [ registry, deploy_registry, container ]
+
+#- name: end play
+#  tags: [ registry, deploy_registry, container ]
+#  meta: end_play
+
+- name: registries.yml - deploy registry config
+  template: 
+    src: config.yml.j2
+    dest: "{{ container_dir }}/{{ registry_name }}/conf/config.yml"
+    owner: "{{ container_user }}"
+    group: "{{ container_group }}"
+    mode: 0644
+  tags: [ registry, deploy_registry, registry_config, container]
+
+- name: registries.yml - Check if container registry is listening
+  uri:
+    url: "https://{{ registry_fqdn }}:{{ registry_port }}/v2/_catalog"
+    user: "{{ registry_username }}"
+    password: "{{ registry_password }}"
+    force_basic_auth: yes
+    validate_certs: no
+  register: container_registry_listen
+  ignore_errors: yes
+  tags: [registry, deploy_registry, container]
+
+- name: registries.yml - Create and start or delete the registry container
+  #become: yes
+  containers.podman.podman_container:
+    pod: "{{ container_pod_name }}"
+    name: "{{ registry_name }}"
+    image: registry:2.7.1
+    #state: "{{ container_status }}"
+    #ports:
+    #    - "{{ registry_port }}:{{ registry_port }}"
+    volume:
+      - "{{ container_dir }}/{{ registry_name }}/registry:/registry:z"
+      - "{{ container_dir }}/auth:/auth:z"
+      - "{{ container_dir }}/certs:/certs:z"
+      - "{{ container_dir }}/{{ registry_name }}/conf/config.yml:/etc/docker/registry/config.yml:z"
+    env:
+       REGISTRY_AUTH_HTPASSWD_REALM: Registry
+       REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+       REGISTRY_AUTH: htpasswd
+       REGISTRY_HTTP_SECRET: "{{ registry_http_secret }}"
+       REGISTRY_HTTP_TLS_CERTIFICATE: "/certs/{{ ssl_cert_filename }}"
+       REGISTRY_HTTP_TLS_KEY: "/certs/{{ ssl_key_filename }}"
+       REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /registry
+  tags: [ registry_container_state, container, registry, deploy_registry ]
+  
+- name: registries.yml - Get facts about the registry container
+  #become: yes
+  containers.podman.podman_container_info:
+    name:
+      - "{{ registry_name }}"
+  register: container_status
+  tags: [ registry_container_state, container, registry, deploy_registry ]
+
+- name: registries.yml - show container status
+  debug:
+    msg: >
+      - "The container ocp4-registry-mirror status is {{ container_status.containers.0.State.Status }}"
+      - "Access is via https://{{ registry_fqdn }}:{{ registry_port }}/v2/_catalog"
+  tags: [ registry_container_state, container, registry, deploy_registry ]

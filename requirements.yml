@@ -1,0 +1,8 @@
+---
+roles:
+  - src: git@github.com:flyemsafe/podman-container-systemd.git
+
+
+collections:
+  - ansible.posix
+  - containers.podman

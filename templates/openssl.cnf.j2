@@ -1,0 +1,22 @@
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = req_ext
+prompt = no
+[req_distinguished_name]
+C   = {{ self_signed_certs_options.cert_country }}
+ST  = {{ self_signed_certs_options.cert_state }}
+L   = {{ self_signed_certs_options.cert_locality }}
+O   = {{ self_signed_certs_options.cert_org_name }}
+OU  = {{ self_signed_certs_options.cert_org_unit }}
+CN  = registry.{{ registry_domain }}
+[req_ext]
+subjectAltName = @alt_names
+[alt_names]
+IP.1 = {{ registry_ip }}
+DNS.1 = reg-cloud-ocp.{{ registry_domain }}
+DNS.2 = reg-connect-rh.{{ registry_domain }}
+DNS.3 = registry.{{ registry_domain }}
+DNS.4 = reg-quay.{{ registry_domain }}
+DNS.5 = reg-redhat.{{ registry_domain }}
+DNS.6 = reg-quay-cdn.{{ registry_domain }}
+DNS.7 = reg-svc.{{ registry_domain }}

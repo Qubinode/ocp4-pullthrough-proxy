@@ -1,0 +1,51 @@
+---
+# tasks file for ocp4-mirror-registry
+
+- name: install the required packages for the registry node
+  when: container_state != 'absent'
+  yum:
+    name: "python3,podman,httpd,httpd-tools,jq"
+    state: installed
+  become: yes
+  tags: packages
+
+#- name: Create temporary build directory
+#  ansible.builtin.tempfile:
+#    state: directory
+#    suffix: ocp_registry
+#  register: ocp_tempdir
+#
+#- name: Declare openshift temporary vars
+#  set_fact:
+#    pull_secret: "{{ playbook_dir }}/files/redhat/pull-secret.json"
+#    generated_pull_secret: "{{ playbook_dir }}/files/redhat/generated_pull-secret.json"
+#    additional_trust_bundle: "{{ playbook_dir }}/files/redhat/trust-bundle.txt"
+#    image_content_sources: "{{ playbook_dir }}/files/redhat/content-sources.txt"
+#    secret_file: "{{ ocp_tempdir.path }}/secret_file"
+#    ssl_certs_source: "{{ ocp_tempdir.path }}"
+
+
+- name: Create generated files dir {{ generated_files_dir }}
+  tags: [ssl_config, ssl_certs, deploy_registry]
+  file:
+    path: "{{ generated_files_dir }}"
+    state: directory
+    recurse: yes
+    mode: '0775'
+    owner: "{{ container_user }}"
+    group: "{{ container_group }}"    
+
+- name: create required self-signed certs
+  import_tasks: create-self-signed-pki.yml
+
+- name: deploy register container
+  when: container_state != 'absent'
+  import_tasks: create-registry.yml
+
+- name: deploy ocp4 files
+  when: container_state != 'absent'
+  import_tasks: create-ocp-install-files.yml
+
+- name: Remove the ocp reg
+  when: container_state == 'absent'
+  import_tasks: removal.yml

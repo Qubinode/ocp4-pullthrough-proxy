@@ -1,0 +1,8 @@
+---
+# handlers file for ocp4-mirror-registry
+
+- name: Update the host with the trust with the self-signed certs
+  when: add_cert_to_trust.changed
+  command: update-ca-trust
+  become: yes
+  tags: [update_trust, ssl_certs, deploy_registry]

@@ -1,0 +1,132 @@
+---
+- name: prerequisite for registry
+  tags: [registry_prereq, deploy_registry]
+  become: yes
+  block:
+    - name: Ensure required directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0775'
+        owner: "{{ container_user }}"
+        group: "{{ container_group }}"
+      loop:
+        - "{{ container_dir }}/auth"
+        - "{{ container_dir }}/certs"
+        - "{{ containers_certs_d }}"
+
+    - name: ensure cert files are copied to {{ containers_certs_d }}
+      copy:
+        remote_src: yes
+        src: "{{ ssl_certs_source }}/{{ item }}"
+        dest: "{{ containers_certs_d }}/{{ item }}"
+        mode: 0644
+      loop:
+        - "{{ ssl_key_filename }}"
+        - "{{ ssl_cert_filename }}"
+
+    - name: ensure certs are copied to {{ container_dir }} certs dir
+      copy:
+        remote_src: yes
+        src: "{{ ssl_certs_source }}/{{ item }}"
+        dest: "{{ container_dir }}/certs"
+        mode: 0644
+      loop:
+        - "{{ ssl_key_filename }}"
+        - "{{ ssl_cert_filename }}"
+
+    - name: rename {{ ssl_cert_filename }} to have cert suffix
+      copy:
+        remote_src: yes
+        src: "{{ ssl_cert_file }}"
+        dest: "{{ containers_certs_d }}/{{ registry_fqdn }}.cert"
+        mode: 0644
+      #ignore_errors: yes
+
+- name: Create a list of registry ports
+  tags: [ registry_container_state, container, registry, deploy_registry, pods, firewall ]
+  set_fact:
+    registry_pod_ports: >-
+      {%- set registry_pod_ports = [] -%}
+      {%- for registry in registry_pods -%}
+        {%- set port = registry.port|string + ':' + registry.port|string -%}
+        {%- do registry_pod_ports.append(port) -%} 
+      {%- endfor -%}
+      {{ registry_pod_ports }}
+    firewall_ports: >-
+      {%- set firewall_ports = [] -%}
+      {%- for registry in registry_pods -%}
+        {%- set port = registry.port -%}
+        {%- set port = registry.port|string + '/tcp' -%}
+        {%- do firewall_ports.append(port) -%} 
+      {%- endfor -%}
+      {{ firewall_ports }}
+    registry_ports: >-
+      {%- set registry_ports = [] -%}
+      {%- for registry in registry_pods -%}
+        {%- set port = registry.port -%}
+        {%- set port = registry.port|string + '/tcp' -%}
+        {%- do registry_ports.append(port) -%} 
+      {%- endfor -%}
+      {{ registry_ports }}
+
+#- name: open ports for registry
+#  tags: [ registry_container_state, container, registry, deploy_registry, pods, firewall ]
+#  become: yes
+#  firewalld:
+#    port: "{{ item }}"
+#    permanent: yes
+#    immediate: yes
+#    state: enabled
+#  loop: "{{ firewall_ports }}"
+
+- name: create random secret for container registry
+  become: yes
+  set_fact:
+    registry_http_secret: "{{ lookup('password', '/tmp/secret' + ' ' + 'chars=ascii_letters') }}"
+  tags: [ registry, deploy_registry, container ]
+
+- name: install pip packages
+  pip:
+    name: "{{ item }}"
+    extra_args: --user
+  loop:
+    - passlib
+    - bcrypt
+  tags: [packages, pip, deploy_registry]
+
+- name: create htpasswd user for registry container
+  htpasswd:
+    state: present
+    path: "{{ container_dir }}/auth/htpasswd"
+    username: "{{ registry_username }}"
+    password: "{{ registry_password }}"
+    owner: "{{ container_user }}"
+    group: "{{ container_group }}"
+    mode: 0640
+    crypt_scheme: bcrypt
+  tags: [setup_htpasswd, deploy_registry]
+
+
+- name: create qubinode ocp mirror pod
+  tags: [ registry_container_state, container, registry, deploy_registry, pods ]
+  containers.podman.podman_pod:
+    name: ocp_registry
+    state: started
+    ports: "{{ registry_pod_ports }}"
+
+
+## Future task is to put this all into a single pod
+## with something like nginx or haproxy
+- name: create-registry.yml - Deploy registry containers
+  include_tasks: registries.yml
+  loop: "{{ registry_pods }}"
+  loop_control:
+    loop_var: outer_item
+    label: outer_item.name
+  tags: [ registry_container_state, container, registry, deploy_registry ]
+
+- name: Deploy Pod and all containers, create systemd unit files and start the pod
+  import_role:
+    name: podman-container-systemd
+  tags: [ registry_container_state, container, registry, deploy_registry, pods ]

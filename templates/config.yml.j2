@@ -1,0 +1,25 @@
+version: 0.1
+log:
+  fields:
+    service: registry
+storage:
+  cache:
+    blobdescriptor: inmemory
+  filesystem:
+    rootdirectory: /var/lib/registry
+http:
+  addr: :{{ registry_port }}
+  headers:
+    X-Content-Type-Options: [nosniff]
+health:
+  storagedriver:
+    enabled: true
+    interval: 10s
+    threshold: 3
+proxy:
+  remoteurl: {{ registry_url }}
+  username: '{{ registry_username }}'
+  password: '{{ registry_password }}'
+compatibility:
+  schema1:
+    enabled: true

@@ -1,0 +1,33 @@
+- mirrors:
+  - reg-quay.{{ registry_domain }}:5001/openshift-release-dev/ocp-release
+  source: quay.io/openshift-release-dev/ocp-release
+- mirrors:
+  - reg-quay.{{ registry_domain }}:5001/openshift-release-dev/ocp-v4.0-art-dev
+  source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+- mirrors:
+  - reg-quay-cdn.{{ registry_domain }}:5004/openshift-release-dev/ocp-release
+  source: cdn02.quay.io/openshift-release-dev/ocp-release
+- mirrors:
+  - reg-quay-cdn.{{ registry_domain }}:5004/openshift-release-dev/ocp-v4.0-art-dev
+  source: cdn02.quay.io/openshift-release-dev/ocp-v4.0-art-dev
+- mirrors:
+  - reg-redhat.{{ registry_domain }}:5003/openshift4
+  source: registry.redhat.io/openshift4
+- mirrors:
+  - reg-redhat.{{ registry_domain }}:5003/container-native-virtualization
+  source: registry.redhat.io/container-native-virtualization
+- mirrors:
+  - reg-redhat.{{ registry_domain }}:5003/ocs4
+  source: registry.redhat.io/ocs4
+- mirrors:
+  - reg-redhat.{{ registry_domain }}:5003/redhat
+  source: registry.redhat.io/redhat
+- mirrors:
+  - reg-redhat.{{ registry_domain }}:5003/rhceph
+  source: registry.redhat.io/rhceph
+- mirrors:
+  - reg-redhat.{{ registry_domain }}:5003/rhscl
+  source: registry.redhat.io/rhscl
+- mirrors:
+  - reg-svc.{{ registry_domain }}:5005/openshift-release-dev/ocp-release
+  source: registry.svc.ci.openshift.org/ocp/release

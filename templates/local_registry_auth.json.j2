@@ -1,0 +1,13 @@
+{
+	"auths": {
+{% for item in registry_pods %}
+		"{{ item.name }}.{{ registry_domain }}:{{ item.port }}": {
+			"auth": "{{ registry_local_auth }}"
+{% if not loop.last %}
+	    },
+{% else %}
+	    }
+{% endif %}
+{% endfor -%}
+	}
+}

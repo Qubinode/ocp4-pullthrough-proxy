@@ -1,0 +1,39 @@
+---
+- name: removal.yml - remove pip packages
+  pip:
+    name: "{{ item }}"
+    state: "{{ container_state }}"
+  loop:
+    - passlib
+    - bcrypt
+  tags: remove_packages
+
+- name: removal.yml - remove the registries
+  include_tasks: remove-registry.yml
+  loop: "{{ registry_pods }}"
+  loop_control:
+    loop_var: outer_item
+    label: outer_item.name
+  tags: remove_packages
+
+- name: removal.yml - Remove container registry certs
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ ssl_ca_key_file }}"
+    - "{{ ssl_ca_csr_file }}"
+    - "{{ ssl_ca_crt_file }}"
+    - "{{ ssl_cert_file }}"
+    - "{{ ssl_key_file }}"
+    - "{{ ssl_csr_file }}"
+    - "{{ ssl_certs_source }}/QubinoderootCA.srl"
+    - "{{ ssl_config_file }}"
+    - "{{ update_trust_file_name }}"
+  become: yes
+  tags: remove_registry_certs
+
+- name: removal.yml - Update the host with the trust with the self-signed certs
+  shell: update-ca-trust
+  become: yes
+  tags: remove_registry_certs
